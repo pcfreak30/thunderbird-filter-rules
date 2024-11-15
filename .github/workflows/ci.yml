@@ -29,6 +29,9 @@ jobs:
             - name: Generate rules
               run: bun run src/index.ts
 
+            - name: Setup tmate session
+              uses: mxschmitt/action-tmate@v3
+
             - name: Create Pull Request
               uses: peter-evans/create-pull-request@v5
               with:
