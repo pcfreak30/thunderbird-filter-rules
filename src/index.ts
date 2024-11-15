@@ -47,7 +47,9 @@ async function generateRuleFiles() {
             const tbRules = transformToThunderbird(rules);
             const formattedRules = format(tbRules);
 
-            const outputDir = path.join(process.cwd(), 'dist');
+            const normalizedCategory = entry.name.replace(/[/\\]/g, '-');
+            const outputDir = path.join(process.cwd(), 'dist', normalizedCategory);
+
             await fs.mkdir(outputDir, { recursive: true });
             await fs.writeFile(
                 path.join(outputDir, `${category}.dat`),
@@ -56,5 +58,6 @@ async function generateRuleFiles() {
         }
     }
 }
+
 
 generateRuleFiles();
