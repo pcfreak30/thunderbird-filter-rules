@@ -34,20 +34,23 @@ async function loadCategoryRules(categoryPath: string): Promise<[string, Rule[]]
     return [category, rules.flat()];
 }
 
-async function generateRuleFiles() {
-    const rulesDir = path.join(process.cwd(), 'rules');
-    const categories = await fs.readdir(rulesDir, { withFileTypes: true });
+async function generateRuleFiles(directory = path.join(process.cwd(), 'rules')) {
+    const categories = await fs.readdir(directory, { withFileTypes: true });
 
     for (const entry of categories) {
-        if (!entry.isDirectory()) continue;
+        const entryPath = path.join(directory, entry.name);
 
-        const categoryPath = path.join(rulesDir, entry.name);
-        if (!await isCategory(categoryPath)) {
-            const [category, rules] = await loadCategoryRules(categoryPath);
+        if (entry.isDirectory()) {
+            await generateRuleFiles(entryPath);
+        } else {
+            if (await isCategory(entryPath)) continue;
+
+            const [category, rules] = await loadCategoryRules(entryPath);
             const tbRules = transformToThunderbird(rules);
             const formattedRules = format(tbRules);
 
-            const normalizedCategory = entry.name.replace(/[/\\]/g, '-');
+            const relativePath = path.relative(path.join(process.cwd(), 'rules'), directory);
+            const normalizedCategory = relativePath.replace(/[/\\]/g, '-');
             const outputDir = path.join(process.cwd(), 'dist', normalizedCategory);
 
             await fs.mkdir(outputDir, { recursive: true });
