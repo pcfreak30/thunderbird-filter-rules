@@ -11,56 +11,69 @@ async function isCategory(dirPath: string): Promise<boolean> {
     const hasYamls = contents.some(entry =>
         entry.isFile() && (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))
     );
+
     return hasSubDirs && !hasYamls;
 }
 
-async function loadCategoryRules(categoryPath: string): Promise<[string, Rule[]]> {
-    const category = path.basename(categoryPath);
-    const allFiles = await fs.readdir(categoryPath, { withFileTypes: true });
-
-    const yamlFiles = allFiles.filter(file =>
-        file.isFile() && (file.name.endsWith('.yml') || file.name.endsWith('.yaml'))
-    );
+async function loadCategoryRules(categoryPath: string): Promise<Rule[]> {
+    const yamlFiles = await fs.readdir(categoryPath, { withFileTypes: true });
 
     const rules = await Promise.all(
-        yamlFiles.map(async file => {
-            const filePath = path.join(categoryPath, file.name);
-            const content = await fs.readFile(filePath, 'utf-8');
-            const parsed = yaml.parse(content);
-            return parsed.rules as Rule[];
-        })
+        yamlFiles
+            .filter(file => file.isFile() && (file.name.endsWith('.yml') || file.name.endsWith('.yaml')))
+            .map(async file => {
+                const filePath = path.join(categoryPath, file.name);
+                const content = await fs.readFile(filePath, 'utf-8');
+                const parsed = yaml.parse(content);
+
+                if (!parsed?.rules || !Array.isArray(parsed.rules)) {
+                    throw new Error(`Invalid or missing 'rules' in file: ${filePath}`);
+                }
+
+                return parsed.rules as Rule[];
+            })
     );
 
-    return [category, rules.flat()];
+    return rules.flat();
 }
 
-async function generateRuleFiles(directory = path.join(process.cwd(), 'rules')) {
-    const categories = await fs.readdir(directory, { withFileTypes: true });
+async function processFile(directory: string): Promise<void> {
+    try {
+        const rules = await loadCategoryRules(directory);
+        const tbRules = transformToThunderbird(rules);
+        const formattedRules = format(tbRules);
 
-    for (const entry of categories) {
+        const relativePath = path.relative(path.join(process.cwd(), 'rules'), directory);
+        const normalizedCategory = relativePath.replace(/[/\\]/g, '-');
+        const outputDir = path.join(process.cwd(), 'dist', normalizedCategory);
+
+        await fs.mkdir(outputDir, { recursive: true });
+        await fs.writeFile(path.join(outputDir, 'msgFilterRules.dat'), formattedRules);
+    } catch (err) {
+        console.error(`Error processing directory ${directory}:`, err);
+    }
+}
+
+async function processDirectory(directory: string): Promise<void> {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+
+    for (const entry of entries) {
         const entryPath = path.join(directory, entry.name);
 
         if (entry.isDirectory()) {
-            await generateRuleFiles(entryPath);
-        } else {
-            if (await isCategory(entryPath)) continue;
-
-            const [category, rules] = await loadCategoryRules(entryPath);
-            const tbRules = transformToThunderbird(rules);
-            const formattedRules = format(tbRules);
-
-            const relativePath = path.relative(path.join(process.cwd(), 'rules'), directory);
-            const normalizedCategory = relativePath.replace(/[/\\]/g, '-');
-            const outputDir = path.join(process.cwd(), 'dist', normalizedCategory);
-
-            await fs.mkdir(outputDir, { recursive: true });
-            await fs.writeFile(
-                path.join(outputDir, `${category}.dat`),
-                formattedRules
-            );
+            await processDirectory(entryPath);
+        } else if (entry.isFile() && entry.name.endsWith('.yml') && !(await isCategory(directory))) {
+            await processFile(directory);
         }
     }
 }
 
+async function generateRuleFiles(directory = path.join(process.cwd(), 'rules')) {
+    try {
+        await processDirectory(directory);
+    } catch (err) {
+        console.error('Error generating rule files:', err);
+    }
+}
 
 generateRuleFiles();

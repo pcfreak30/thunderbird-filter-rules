@@ -2,6 +2,7 @@
   "name": "thunderbird-filter-rules",
   "version": "1.0.0",
   "description": "Automated Thunderbird spam filter rule generation",
+    "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
