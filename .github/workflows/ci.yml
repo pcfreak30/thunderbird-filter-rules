@@ -21,7 +21,7 @@ jobs:
               run: bun install
 
             - name: Remove existing rules
-              run: rm -f rules
+              run: rm -rf rules
 
             - name: Generate rules
               run: bun run src/index.ts
