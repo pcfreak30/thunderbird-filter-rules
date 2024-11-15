@@ -23,8 +23,8 @@ jobs:
             - name: Remove existing rules
               shell: bash
               run: |
-                    if [ -d src/rules ]; then
-                        rm -rf src/rules
+                    if [ -d rules ]; then
+                        rm -rf rules
                     fi
             - name: Generate rules
               run: bun run src/index.ts
